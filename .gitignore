@@ -1,3 +1,7 @@
+extern/googletest/build
+bin
+
+
 # Prerequisites
 *.d
 

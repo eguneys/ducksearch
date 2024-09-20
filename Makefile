@@ -1,23 +1,27 @@
 CXX = g++
 CXXFLAGS = -Iextern/googletest/googletest/include -Iinclude -std=c++17 -pthread
 
-GTEST_LIB = -Lextern/googletest/lib -lgtest -lgtest_main
+GTEST_LIB = -Lextern/googletest/build/lib -lgtest -lgtest_main
 
+TARGET_DIR = bin
 SRC = $(wildcard src/*.cpp)
 OBJ = $(SRC:.cpp=.0)
-TARGET = ducksearch
 TEST_SRC = $(wildcard tests/*.cpp)
-TEST_TARGET=ducksearch_tests
-DIST_DIR = dist
+TARGET = $(TARGET_DIR)/ducksearch
+TEST_TARGET= $(TARGET_DIR)/ducksearch_tests
 
-GTEST_BUILD_DIR = extern/googletest
+GTEST_BUILD_DIR = extern/googletest/build
 GTEST_MARKER = $(GTEST_BUILD_DIR)/.built
 
-all: $(GTEST_MARKER) $(TARGET)
+all: $(GTEST_MARKER) $(TARGET_DIR) $(TARGET)
+
+$(TARGET_DIR):
+	mkdir -p $@
 
 $(GTEST_MARKER):
 	@echo "Building Google Test"
-	cd $(GTEST_BUILD_DIR) && cmake . && make
+	mkdir -p $(GTEST_BUILD_DIR)
+	cd $(GTEST_BUILD_DIR) && cmake .. && make
 	touch $@
 
 
@@ -25,7 +29,7 @@ $(TARGET): $(OBJ)
 	$(CXX) -o $@ $^
 
 
-test: $(GTEST_MARKER) $(TEST_TARGET)
+test: $(GTEST_MARKER) $(TARGET_DIR) $(TEST_TARGET)
 	./$(TEST_TARGET)
 
 
@@ -38,4 +42,4 @@ $(TEST_TARGET): $(filter-out src/main.cpp, $(SRC)) $(TEST_SRC)
 
 clean:
 	rm -f $(OBJ) $(TARGET) $(TEST_TARGET)
-	rm -f $(GTEST_BUILD_DIR)/.built
+	rm -rf $(GTEST_BUILD_DIR)
