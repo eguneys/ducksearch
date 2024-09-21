@@ -79,7 +79,7 @@ class DuckBoard {
    void Clear();
    void Mirror();
 
-   void SetFromFen(std::string fen);
+   void SetFromFen(std::string fen, int* rule50_ply = nullptr, int* moves = nullptr);
 
    Square duck_after_move(BoardSquare source, BoardSquare destination) const {
       return ~(((us_ | them_ | duck_) - source) | destination);

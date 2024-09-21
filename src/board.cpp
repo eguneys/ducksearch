@@ -128,37 +128,39 @@ static Square bishop_attacks_table[5248];
 static void BuildAttacksTable(MagicParams* magic_params, Square* attacks_table, const std::pair<int, int>* directions) {
     int table_offset = 0;
 
-    for (auto b_sq = 0; b_sq < 64; b_sq++) {
-        square mask = 0;
+    for (auto sq = 0; sq < 64; sq++) {
+        const BoardSquare b_sq(sq);
+        Square mask = Square(0);
 
         for (int j = 0; j < 4; j++) {
             auto direction = directions[j];
-            auto dst_row = BoardSquare(b_sq).row();
-            auto dst_col = BoardSquare(b_sq).col();
+            auto dst_row = b_sq.row();
+            auto dst_col = b_sq.col();
 
             while (true) {
                 dst_row += direction.first;
                 dst_col += direction.second;
 
-                if (dst_row >= 0 && dst_row < 8 && dst_col >= 0 && dst_col < 8) {
-                    const i_square dst_sq = dst_row * 8 + dst_col;
-                    mask |= (1 << dst_sq);
-                } else {
+                if (!BoardSquare::make(dst_row + direction.first,
+                                       dst_col + direction.second)
+                         .has_value()) {
                     break;
                 }
+                const BoardSquare destination(dst_row, dst_col);
+                mask.set(destination);
             }
         }
 
-        magic_params[b_sq].mask = mask;
+        magic_params[sq].mask = mask.as_int();
 
         std::vector<BoardSquare> occupancy_squares;
 
-        for (auto occ_sq: Square(magic_params[b_sq].mask)) {
+        for (auto occ_sq: Square(magic_params[sq].mask)) {
             occupancy_squares.emplace_back(occ_sq);
         }
 
 
-        magic_params[b_sq].attacks_table = &attacks_table[table_offset];
+        magic_params[sq].attacks_table = &attacks_table[table_offset];
 
         for (int i = 0; i < (1 << occupancy_squares.size()); i++) {
             attacks_table[table_offset + i] = 0;
@@ -177,25 +179,23 @@ static void BuildAttacksTable(MagicParams* magic_params, Square* attacks_table, 
 
             for (int j = 0; j < 4; j++) {
                 auto direction = directions[j];
-                auto dst_row = b_sq / 8;
-                auto dst_col = b_sq % 8;
+                auto dst_row = b_sq.row();
+                auto dst_col = b_sq.col();
                 while (true) {
                     dst_row += direction.first;
                     dst_col += direction.second;
 
-                    if (dst_row >= 0 && dst_row < 8 && dst_col >= 0 &&
-                        dst_col < 8) {
-                        const BoardSquare destination(dst_row, dst_col);
-                        attacks.set(destination);
-                        if (occupancy.get(destination)) break;
-                    } else {
+                    if (!BoardSquare::make(dst_row, dst_col).has_value()) {
                         break;
                     }
+                    const BoardSquare destination(dst_row, dst_col);
+                    attacks.set(destination);
+                    if (occupancy.get(destination)) break;
                 }
             }
 
 
-            square index = _pext_u64(occupancy.as_int(), magic_params[b_sq].mask);
+            square index = _pext_u64(occupancy.as_int(), magic_params[sq].mask);
 
             attacks_table[table_offset + index] = attacks;
         }
@@ -205,13 +205,13 @@ static void BuildAttacksTable(MagicParams* magic_params, Square* attacks_table, 
 }
 
 
-static inline Square GetRookAttacks(const square rook_sq, const square occupied) {
-    square index = _pext_u64(occupied, rook_magic_params[rook_sq].mask);
-    return rook_magic_params[rook_sq].attacks_table[index];
+static inline Square GetRookAttacks(const BoardSquare rook_sq, const square occupied) {
+    square index = _pext_u64(occupied, rook_magic_params[rook_sq.as_int()].mask);
+    return rook_magic_params[rook_sq.as_int()].attacks_table[index];
 }
-static inline Square GetBishopAttacks(const square bishop_sq, const square occupied) {
-    square index = _pext_u64(occupied, bishop_magic_params[bishop_sq].mask);
-    return bishop_magic_params[bishop_sq].attacks_table[index];
+static inline Square GetBishopAttacks(const BoardSquare bishop_sq, const square occupied) {
+    square index = _pext_u64(occupied, bishop_magic_params[bishop_sq.as_int()].mask);
+    return bishop_magic_params[bishop_sq.as_int()].attacks_table[index];
 }
 
 void InitializeMagicBitboards() {
@@ -240,6 +240,7 @@ MoveList DuckBoard::GenerateMoves() const {
                 for (auto duck: duck_after_move(source, destination))
                     result.emplace_back(source, destination, duck);
             }
+            continue;
         }
 
 
@@ -247,7 +248,7 @@ MoveList DuckBoard::GenerateMoves() const {
 
         if (rooks_.get(source)) {
             processed_piece = true;
-            Square attacked = GetRookAttacks(source.as_square(), occupied().as_square()) - us_ - duck_;
+            Square attacked = GetRookAttacks(source, occupied().as_square()) - us_ - duck_;
 
 
             for (const auto& destination: attacked) {
@@ -258,7 +259,7 @@ MoveList DuckBoard::GenerateMoves() const {
 
         if (bishops_.get(source)) {
             processed_piece = true;
-            Square attacked = GetBishopAttacks(source.as_square(), occupied().as_square()) - us_ - duck_;
+            Square attacked = GetBishopAttacks(source, occupied().as_square()) - us_ - duck_;
 
 
             for (const auto& destination: attacked) {
@@ -281,7 +282,7 @@ MoveList DuckBoard::GenerateMoves() const {
                         for (auto duck : duck_after_move(source, destination))
                             result.emplace_back(source, destination, duck);
                         if (dst_row == 2) {
-                            if (!occupied().get(3)) {
+                            if (!occupied().get(3, dst_col)) {
                                 for (auto duck : duck_after_move(source, destination))
                                     result.emplace_back(source, destination,
                                                         duck);
@@ -363,6 +364,9 @@ bool DuckBoard::ApplyMove(Move move) {
         return true;
     }
     
+    duck_ = move.duck();
+    has_duck_ = true;
+
 
     rooks_.set_if(to, rooks_.get(from));
     bishops_.set_if(to, bishops_.get(from));
@@ -392,9 +396,9 @@ void DuckBoard::Mirror() {
     flipped_ = !flipped_;
 }
 
-const char* DuckBoard::kStartposFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w";
+const char* DuckBoard::kStartposFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w 0 1";
 
-void DuckBoard::SetFromFen(std::string fen) {
+void DuckBoard::SetFromFen(std::string fen, int* rule50_ply, int* moves) {
     Clear();
     int row = 7;
     int col = 0;
@@ -404,6 +408,10 @@ void DuckBoard::SetFromFen(std::string fen) {
     fen_str >> board;
     std::string turn = "w";
     fen_str >> turn;
+    int rule50_halfmoves = 0;
+    fen_str >> rule50_halfmoves;
+    int total_moves = 1;
+    fen_str >> total_moves;
 
     for (char c: board) {
         if (c == '/') {
@@ -448,6 +456,9 @@ void DuckBoard::SetFromFen(std::string fen) {
     if (turn == "b") {
         Mirror();
     }
+
+    if (rule50_ply) *rule50_ply = rule50_halfmoves;
+    if (moves) *moves = total_moves;
 }
 
 
