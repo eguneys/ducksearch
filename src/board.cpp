@@ -1,5 +1,4 @@
 #include "board.h"
-#include <vector>
 #include <immintrin.h>
 
 static const std::pair<int, int> kKingMoves[] = {
@@ -112,28 +111,27 @@ static const square kPawnAttacks[] = {
 
 struct MagicParams {
     square mask;
-    square* attacks_table;
+    Square* attacks_table;
 };
 
 static MagicParams rook_magic_params[64];
 static MagicParams bishop_magic_params[64];
 
 
-static square rook_attacks_table[102400];
-static square bishop_attacks_table[5248];
+static Square rook_attacks_table[102400];
+static Square bishop_attacks_table[5248];
 
 
-static void BuildAttacksTable(MagicParams* magic_params, square* attacks_table, const std::pair<int, int>* directions) {
+static void BuildAttacksTable(MagicParams* magic_params, Square* attacks_table, const std::pair<int, int>* directions) {
     int table_offset = 0;
 
-    for (auto sq : BoardSquare(A1)) {
-        i_square b_sq = sq.as_square();
+    for (auto b_sq = 0; b_sq < 64; b_sq++) {
         square mask = 0;
 
         for (int j = 0; j < 4; j++) {
             auto direction = directions[j];
-            auto dst_row = sq.row();
-            auto dst_col = sq.col();
+            auto dst_row = BoardSquare(b_sq).row();
+            auto dst_col = BoardSquare(b_sq).col();
 
             while (true) {
                 dst_row += direction.first;
@@ -150,7 +148,7 @@ static void BuildAttacksTable(MagicParams* magic_params, square* attacks_table, 
 
         magic_params[b_sq].mask = mask;
 
-        std::vector<square> occupancy_squares;
+        std::vector<BoardSquare> occupancy_squares;
 
         for (auto occ_sq: Square(magic_params[b_sq].mask)) {
             occupancy_squares.emplace_back(occ_sq);
@@ -165,14 +163,14 @@ static void BuildAttacksTable(MagicParams* magic_params, square* attacks_table, 
 
 
         for (int i = 0; i < (1 << occupancy_squares.size()); i++) {
-            square occupancy = 0;
+            Square occupancy(0);
 
             for (size_t bit = 0; bit < occupancy_squares.size(); bit++) {
-                occupancy |= ((1 << bit) & i) << occupancy_squares[bit];
+                occupancy.set_if(occupancy_squares[bit], (1 << bit) & i);
             }
 
 
-            square attacks = 0;
+            Square attacks(0);
 
             for (int j = 0; j < 4; j++) {
                 auto direction = directions[j];
@@ -184,9 +182,9 @@ static void BuildAttacksTable(MagicParams* magic_params, square* attacks_table, 
 
                     if (dst_row >= 0 && dst_row < 8 && dst_col >= 0 &&
                         dst_col < 8) {
-                        const square dst_sq = dst_row * 8 + dst_col;
-                        attacks |= (1 << dst_sq);
-                        if (occupancy & (1ULL << dst_sq)) break;
+                        const BoardSquare destination(dst_row, dst_col);
+                        attacks.set(destination);
+                        if (occupancy.get(destination)) break;
                     } else {
                         break;
                     }
@@ -194,7 +192,7 @@ static void BuildAttacksTable(MagicParams* magic_params, square* attacks_table, 
             }
 
 
-            square index = _pext_u64(occupancy, magic_params[b_sq].mask);
+            square index = _pext_u64(occupancy.as_int(), magic_params[b_sq].mask);
 
             attacks_table[table_offset + index] = attacks;
         }
@@ -204,11 +202,11 @@ static void BuildAttacksTable(MagicParams* magic_params, square* attacks_table, 
 }
 
 
-static inline square GetRookAttacks(const square rook_sq, const square occupied) {
+static inline Square GetRookAttacks(const square rook_sq, const square occupied) {
     square index = _pext_u64(occupied, rook_magic_params[rook_sq].mask);
     return rook_magic_params[rook_sq].attacks_table[index];
 }
-static inline square GetBishopAttacks(const square bishop_sq, const square occupied) {
+static inline Square GetBishopAttacks(const square bishop_sq, const square occupied) {
     square index = _pext_u64(occupied, bishop_magic_params[bishop_sq].mask);
     return bishop_magic_params[bishop_sq].attacks_table[index];
 }
@@ -216,4 +214,16 @@ static inline square GetBishopAttacks(const square bishop_sq, const square occup
 void InitializeMagicBitboards() {
     BuildAttacksTable(rook_magic_params, rook_attacks_table, kRookDirections);
     BuildAttacksTable(bishop_magic_params, bishop_attacks_table, kBishopDirections);
+}
+
+
+MoveList DuckBoard::GenerateMoves() const {
+    MoveList result;
+    result.reserve(20 * 64);
+    for (auto source: turn_pieces()) {
+        if (source == turn_king()) {
+
+        }
+    }
+    return result;
 }

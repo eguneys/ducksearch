@@ -3,6 +3,45 @@
 #include <string>
 #include <optional>
 
+
+
+inline unsigned long GetLowestBit(std::uint64_t value) {
+    return __builtin_ctzll(value);
+}
+
+// Iterates over all set bits of the value, lower to upper. The value of
+// dereferenced iterator is bit number (lower to upper, 0 bazed)
+template <typename T>
+class BitIterator {
+ public:
+  using iterator_category = std::input_iterator_tag;
+  using difference_type = T;
+  using value_type = T;
+  using pointer = T*;
+  using reference = T&;
+
+  BitIterator(std::uint64_t value) : value_(value){};
+  bool operator!=(const BitIterator& other) { return value_ != other.value_; }
+
+  void operator++() { value_ &= (value_ - 1); }
+  T operator*() const { return GetLowestBit(value_); }
+
+ private:
+  std::uint64_t value_;
+};
+
+class IterateBits {
+ public:
+  IterateBits(std::uint64_t value) : value_(value) {}
+  BitIterator<int> begin() { return value_; }
+  BitIterator<int> end() { return 0; }
+
+ private:
+  std::uint64_t value_;
+};
+
+
+
 using square = unsigned long long;
 using i_square = square;
 
@@ -94,7 +133,8 @@ constexpr i_square H8 = A1 << 63;
 
 class BoardSquare {
    public:
-    BoardSquare(short value) : value_(value) {}
+    constexpr BoardSquare(short value) : value_(value) {}
+    constexpr BoardSquare(int row, int col): BoardSquare(row * 8 + col) {}
 
     static std::optional<BoardSquare> make(short row, short col) {
         if (row >= 0 && row < 8 && col >= 0 && col < 8) {
@@ -114,34 +154,16 @@ class BoardSquare {
         return value_ != other.value_;
     }
 
+    constexpr std::uint8_t as_int() const { return value_; }
     constexpr i_square as_square() const { return 1ULL << value_; }
 
     std::string as_string() const {
         return std::string(1, 'a' + col()) + std::string(1, '1' + row());
     }
 
-    class BoardSquareIterator {
-       public:
-        BoardSquareIterator(square value) : value_(value) {}
+    BitIterator<BoardSquare> begin() const { return value_; }
 
-        BoardSquare operator*() const { return BoardSquare(value_); }
-
-        BoardSquareIterator& operator++() {
-            ++value_;
-            return *this;
-        }
-
-        bool operator!=(const BoardSquareIterator& other) const {
-            return value_ != other.value_;
-        }
-
-       private:
-        short value_;
-    };
-
-    BoardSquareIterator begin() const { return BoardSquareIterator(value_); }
-
-    BoardSquareIterator end() const { return BoardSquareIterator(64); }
+    BitIterator<BoardSquare> end() const { return 0; }
 
    private:
     short value_;
@@ -149,7 +171,8 @@ class BoardSquare {
 
 class Square {
    public:
-    Square(square value) : value_(value) {}
+    constexpr Square(square value) : value_(value) {}
+    Square() = default;
 
 
     bool operator==(const Square& other) const {
@@ -160,10 +183,28 @@ class Square {
         return value_ != other.value_;
     }
 
+    void set_if(BoardSquare square, bool cond) { set_if(square.as_int(), cond); }
+    void set_if(std::uint8_t pos, bool cond) { 
+        value_  |= (std::uint64_t(cond) << pos);
+    }
+
+
+    void set(BoardSquare square) { set (square.as_int()); }
+    void set(std::uint8_t pos){ value_ |= (std::uint64_t(1) << pos); }
+    void set(int row, int col) { set(BoardSquare(row, col)); }
+
+    bool get(BoardSquare square) const { return get(square.as_int()); }
+    bool get(std::uint8_t pos) const {
+        return value_ & (std::uint64_t(1) << pos);
+    }
+    bool get(int row, int col) const { return get(BoardSquare(row, col)); }
+
     friend Square operator|(const Square& a, const Square& b) { return a.value_ | b.value_; }
     friend Square operator&(const Square& a, const Square& b) { return a.value_ & b.value_; }
     friend Square operator-(const Square& a, const Square& b) { return a.value_ & ~b.value_; }
     friend Square operator-(const Square& a, const BoardSquare& b) { return a.value_ & ~b.as_square(); }
+
+    const std::uint64_t as_int() const { return value_; }
 
     std::string as_string() {
         std::string res;
@@ -179,35 +220,12 @@ class Square {
         return res;
     }
 
-    class BitIterator {
-        public:
-        BitIterator(square value, short position): data(value), ptr(position) {}
-
-        bool operator*() const {
-            return (data & (1ULL << ptr)) != 0;
-        }
-
-        BitIterator& operator++() {
-            ++ptr;
-            return *this;
-        }
-
-
-        bool operator!=(const BitIterator& other) const {
-            return ptr != other.ptr && data != other.data;
-        }
-
-        private:
-        square data;
-        square ptr;
-    };
-
-    BitIterator begin() const {
-        return BitIterator(value_, 0);
+    BitIterator<BoardSquare> begin() const {
+        return value_;
     }
 
-    BitIterator end() const {
-        return BitIterator(value_, 64);
+    BitIterator<BoardSquare> end() const {
+        return 0;
     }
 
 
@@ -215,3 +233,4 @@ class Square {
    private:
     square value_;
 };
+
