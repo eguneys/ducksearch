@@ -162,6 +162,8 @@ class BoardSquare {
     constexpr BoardSquare() {}
     constexpr BoardSquare(short value) : value_(value) {}
     constexpr BoardSquare(int row, int col): BoardSquare(row * 8 + col) {}
+    BoardSquare(const std::string& str, bool black = false)
+        : BoardSquare(black ? '8' - str[1] : str[1] - '1', str[0] - 'a') {}
 
     static std::optional<BoardSquare> make(short row, short col) {
         if (row >= 0 && row < 8 && col >= 0 && col < 8) {

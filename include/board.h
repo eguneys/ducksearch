@@ -17,6 +17,9 @@ class Move {
     constexpr Move(BoardSquare from, BoardSquare to, BoardSquare duck): 
                    data_(to.as_int() + (from.as_int() << 6) + (duck.as_int() << 12)) {}
 
+    Move(const std::string& str, bool black = false);
+    Move(const char* str, bool black = false): Move(std::string(str), black) {}
+
     BoardSquare to() const { return BoardSquare(data_ & kToMask); }
     BoardSquare from() const { return BoardSquare((data_ & kFromMask) >> 6); }
     BoardSquare duck() const { return BoardSquare((data_ & kDuckMask) >> 12); }
@@ -36,14 +39,8 @@ class Move {
         switch (promotion()) {
             case Promotion::None:
             return res;
-            case Promotion::Queen:
+            default:
             return res + 'q';
-            case Promotion::Rook:
-            return res + 'r';
-            case Promotion::Bishop:
-            return res + 'b';
-            case Promotion::Knight:
-            return res + 'n';
         }
     }
 

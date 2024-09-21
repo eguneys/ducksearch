@@ -503,3 +503,13 @@ std::string DuckBoard::DebugString() const {
     }
     return result;
 }
+
+
+Move::Move(const std::string& str, bool black) {
+    SetDuck(BoardSquare(str.substr(0, 2), black));
+    SetFrom(BoardSquare(str.substr(3, 2), black));
+    SetTo(BoardSquare(str.substr(5, 2), black));
+    if (str.size() != 7) {
+        SetPromotion(Promotion::Queen);
+    }
+}
