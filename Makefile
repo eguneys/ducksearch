@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -Iextern/googletest/googletest/include -Iinclude -Wall -Werror -std=c++17 -mbmi2 -pthread
+CXXFLAGS = -Iextern/googletest/googletest/include -Iinclude -Wall -Werror -std=c++20 -mbmi2 -pthread
 LDFLAGS =
 
 DEBUG_FLAGS = -g -O0

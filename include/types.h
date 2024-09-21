@@ -183,6 +183,8 @@ class Square {
         return value_ != other.value_;
     }
 
+    Square operator~() const { return Square(~value_); }
+
     void set_if(BoardSquare square, bool cond) { set_if(square.as_int(), cond); }
     void set_if(std::uint8_t pos, bool cond) { 
         value_  |= (std::uint64_t(cond) << pos);
@@ -203,7 +205,9 @@ class Square {
     friend Square operator&(const Square& a, const Square& b) { return a.value_ & b.value_; }
     friend Square operator-(const Square& a, const Square& b) { return a.value_ & ~b.value_; }
     friend Square operator-(const Square& a, const BoardSquare& b) { return a.value_ & ~b.as_square(); }
+    friend Square operator|(const Square& a, const BoardSquare& b) { return a.value_ | b.as_square(); }
 
+    constexpr square as_square() const { return value_; }
     const std::uint64_t as_int() const { return value_; }
 
     std::string as_string() {

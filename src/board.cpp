@@ -1,5 +1,7 @@
 #include "board.h"
 #include <immintrin.h>
+#include <vector>
+#include <ranges>
 
 static const std::pair<int, int> kKingMoves[] = {
     {-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}};
@@ -220,9 +222,112 @@ void InitializeMagicBitboards() {
 MoveList DuckBoard::GenerateMoves() const {
     MoveList result;
     result.reserve(20 * 64);
-    for (auto source: turn_pieces()) {
-        if (source == turn_king()) {
+    for (auto source: us_) {
+        if (source == us_king_) {
+            for (const auto& delta: kKingMoves) {
+                const auto dst_row = source.row() + delta.first;
+                const auto dst_col = source.col() + delta.second;
+                const std::optional<BoardSquare> m_dest = BoardSquare::make(dst_row, dst_col);
 
+                if (!m_dest.has_value()) {
+                    continue;
+                }
+
+                const BoardSquare destination = m_dest.value();
+                if (us_.get(destination) || duck_ == destination) continue;
+
+                for (auto duck: duck_after_move(source, destination))
+                    result.emplace_back(source, destination, duck);
+            }
+        }
+
+
+        bool processed_piece = false;
+
+        if (rooks_.get(source)) {
+            processed_piece = true;
+            Square attacked = GetRookAttacks(source.as_square(), occupied().as_square()) - us_ - duck_;
+
+
+            for (const auto& destination: attacked) {
+                for (auto duck: duck_after_move(source, destination))
+                    result.emplace_back(source, destination, duck);
+            }
+        }
+
+        if (bishops_.get(source)) {
+            processed_piece = true;
+            Square attacked = GetBishopAttacks(source.as_square(), occupied().as_square()) - us_ - duck_;
+
+
+            for (const auto& destination: attacked) {
+                for (auto duck: duck_after_move(source, destination))
+                    result.emplace_back(source, destination, duck);
+            }
+        }
+
+        if (processed_piece) continue;
+
+        if (pawns_.get(source)) {
+            // forward
+            {
+                const auto dst_row = source.row() + 1;
+                const auto dst_col = source.col();
+                const BoardSquare destination(dst_row, dst_col);
+
+                if (!occupied().get(destination)) {
+                    if (dst_row != 7) {
+                        for (auto duck : duck_after_move(source, destination))
+                            result.emplace_back(source, destination, duck);
+                        if (dst_row == 2) {
+                            if (!occupied().get(3)) {
+                                for (auto duck : duck_after_move(source, destination))
+                                    result.emplace_back(source, destination,
+                                                        duck);
+                            }
+                        }
+                    } else {
+                        for (auto duck : duck_after_move(source, destination))
+                            result.emplace_back(source, destination, duck,
+                                                Move::Promotion::Queen);
+                    }
+                }
+            }
+
+            // captures
+            {
+                for (auto direction : { -1, 1 }) {
+                    const auto dst_row = source.row() + 1;
+                    const auto dst_col = source.col() + direction;
+                    const std::optional<BoardSquare> m_dest =
+                        BoardSquare::make(dst_row, dst_col);
+
+                    if (!m_dest.has_value()) {
+                        continue;
+                    }
+                    const BoardSquare destination = m_dest.value();
+
+                    if (them_.get(destination)) {
+                        if (dst_row == 7) {
+                            for (auto duck : duck_after_move(source, destination))
+                                result.emplace_back(source, destination, duck,
+                                                    Move::Promotion::Queen);
+                        } else {
+                            for (auto duck : duck_after_move(source, destination))
+                                result.emplace_back(source, destination, duck);
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+
+        // knight
+        {
+            for (const auto destination: kKnightAttacks[source.as_int()] - us_ - duck_) {
+                for (auto duck : duck_after_move(source, destination))
+                    result.emplace_back(source, destination, duck);
+            }
         }
     }
     return result;
