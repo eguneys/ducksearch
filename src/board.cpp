@@ -335,28 +335,34 @@ MoveList DuckBoard::GenerateMoves() const {
 }
 
 
-void DuckBoard::ApplyMove(Move move) {
+bool DuckBoard::ApplyMove(Move move) {
     auto from = move.from();
     auto to = move.to();
 
     us_.reset(from);
     us_.set(to);
 
+    bool reset_50_moves = them_.get(to);
     them_.reset(to);
     rooks_.reset(to);
     bishops_.reset(to);
     pawns_.reset(to);
 
+
+    reset_50_moves |= pawns_.get(from);
+
     if (from == us_king_) {
         us_king_ = to;
+        return reset_50_moves;
     }
 
     if (to.row() == 7 && pawns_.get(from)) {
         rooks_.set(to);
         bishops_.set(to);
         pawns_.reset(from);
-        return;
+        return true;
     }
+    
 
     rooks_.set_if(to, rooks_.get(from));
     bishops_.set_if(to, bishops_.get(from));
@@ -364,6 +370,8 @@ void DuckBoard::ApplyMove(Move move) {
     rooks_.reset(from);
     bishops_.reset(from);
     pawns_.reset(from);
+
+    return reset_50_moves;
 }
 
 void DuckBoard::Clear() {
@@ -407,13 +415,18 @@ void DuckBoard::SetFromFen(std::string fen) {
             col += c - '0';
             continue;
         }
-        if (std::isupper(c)) {
-            us_.set(row, col);
-        } else {
-            them_.set(row, col);
+        if (c != 'd') {
+            if (std::isupper(c)) {
+                us_.set(row, col);
+            } else {
+                them_.set(row, col);
+            }
         }
 
-        if (c == 'K') {
+        if (c == 'd') {
+            duck_.set(row, col);
+            has_duck_ = true;
+        } else if (c == 'K') {
             us_king_.set(row, col);
         } else if (c == 'k') {
             them_king_.set(row, col);
@@ -444,13 +457,13 @@ std::string DuckBoard::DebugString() const {
     result += '\n';
     for (int i = 7; i >= 0; --i) {
         for (int j = 0; j < 8; ++j) {
-            if (duck_ == BoardSquare(i, j)) {
+            if (has_duck_ && duck_ == BoardSquare(i, j)) {
                 result += 'd';
             } else if (!us_.get(i, j) && !them_.get(i, j)) {
                 result += '.';
-            } else if (us_king_ == i * 8 + j) {
+            } else if (has_us_king() && us_king_ == i * 8 + j) {
                 result += 'K';
-            } else if (them_king_ == i * 8 + j) {
+            } else if (has_them_king() && them_king_ == i * 8 + j) {
                 result += 'k';
             } else {
                 char c = '?';

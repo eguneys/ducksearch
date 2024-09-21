@@ -11,7 +11,7 @@ pppppppp
 ........
 ........
 PPPPPPPP
-dNBQKBNR (from white's eyes)
+RNBQKBNR (from white's eyes)
 )");
 }
 
