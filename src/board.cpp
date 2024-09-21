@@ -441,6 +441,7 @@ void DuckBoard::SetFromFen(std::string fen) {
 std::string DuckBoard::DebugString() const {
     std::string result;
 
+    result += '\n';
     for (int i = 7; i >= 0; --i) {
         for (int j = 0; j < 8; ++j) {
             if (duck_ == BoardSquare(i, j)) {

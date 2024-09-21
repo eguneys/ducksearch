@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 #include "types.h"
 
-
 TEST(SquaresTest, Operations) {
     EXPECT_EQ(Square(A1 | E8).as_string(), R"(
 ....o...

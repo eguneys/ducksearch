@@ -244,6 +244,7 @@ class Square {
 
     void Mirror() { value_ = ReverseBytesInBytes(value_); }
 
+    const BoardSquare as_board_square() const { return GetLowestBit(value_); }
     constexpr square as_square() const { return value_; }
     const std::uint64_t as_int() const { return value_; }
 
