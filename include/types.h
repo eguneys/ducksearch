@@ -5,6 +5,32 @@
 
 
 
+inline uint64_t ReverseBitsInBytes(uint64_t v) {
+  v = ((v >> 1) & 0x5555555555555555ull) | ((v & 0x5555555555555555ull) << 1);
+  v = ((v >> 2) & 0x3333333333333333ull) | ((v & 0x3333333333333333ull) << 2);
+  v = ((v >> 4) & 0x0F0F0F0F0F0F0F0Full) | ((v & 0x0F0F0F0F0F0F0F0Full) << 4);
+  return v;
+}
+
+inline uint64_t ReverseBytesInBytes(uint64_t v) {
+  v = (v & 0x00000000FFFFFFFF) << 32 | (v & 0xFFFFFFFF00000000) >> 32;
+  v = (v & 0x0000FFFF0000FFFF) << 16 | (v & 0xFFFF0000FFFF0000) >> 16;
+  v = (v & 0x00FF00FF00FF00FF) << 8 | (v & 0xFF00FF00FF00FF00) >> 8;
+  return v;
+}
+
+// Transpose across the diagonal connecting bit 7 to bit 56.
+inline uint64_t TransposeBitsInBytes(uint64_t v) {
+  v = (v & 0xAA00AA00AA00AA00ULL) >> 9 | (v & 0x0055005500550055ULL) << 9 |
+      (v & 0x55AA55AA55AA55AAULL);
+  v = (v & 0xCCCC0000CCCC0000ULL) >> 18 | (v & 0x0000333300003333ULL) << 18 |
+      (v & 0x3333CCCC3333CCCCULL);
+  v = (v & 0xF0F0F0F000000000ULL) >> 36 | (v & 0x000000000F0F0F0FULL) << 36 |
+      (v & 0x0F0F0F0FF0F0F0F0ULL);
+  return v;
+}
+
+
 inline unsigned long GetLowestBit(std::uint64_t value) {
     return __builtin_ctzll(value);
 }
@@ -133,6 +159,7 @@ constexpr i_square H8 = A1 << 63;
 
 class BoardSquare {
    public:
+    constexpr BoardSquare() {}
     constexpr BoardSquare(short value) : value_(value) {}
     constexpr BoardSquare(int row, int col): BoardSquare(row * 8 + col) {}
 
@@ -146,6 +173,8 @@ class BoardSquare {
     int row() const { return value_ / 8; }
     int col() const { return value_ % 8; }
 
+    void set(int row, int col) { value_ = row * 8 + col; }
+
     constexpr bool operator==(const BoardSquare& other) const {
         return value_ == other.value_;
     }
@@ -153,6 +182,8 @@ class BoardSquare {
     constexpr bool operator!=(const BoardSquare& other) const {
         return value_ != other.value_;
     }
+
+    void Mirror() { value_ ^= 0b111000; }
 
     constexpr std::uint8_t as_int() const { return value_; }
     constexpr i_square as_square() const { return 1ULL << value_; }
@@ -166,7 +197,7 @@ class BoardSquare {
     BitIterator<BoardSquare> end() const { return 0; }
 
    private:
-    short value_;
+    short value_ = 0;
 };
 
 class Square {
@@ -190,6 +221,10 @@ class Square {
         value_  |= (std::uint64_t(cond) << pos);
     }
 
+    void reset(BoardSquare square) { reset(square.as_int()); }
+    void reset(std::uint8_t pos){ value_ &= ~(std::uint64_t(1) << pos); }
+    void reset(int row, int col) { reset(BoardSquare(row, col)); }
+
 
     void set(BoardSquare square) { set (square.as_int()); }
     void set(std::uint8_t pos){ value_ |= (std::uint64_t(1) << pos); }
@@ -206,6 +241,8 @@ class Square {
     friend Square operator-(const Square& a, const Square& b) { return a.value_ & ~b.value_; }
     friend Square operator-(const Square& a, const BoardSquare& b) { return a.value_ & ~b.as_square(); }
     friend Square operator|(const Square& a, const BoardSquare& b) { return a.value_ | b.as_square(); }
+
+    void Mirror() { value_ = ReverseBytesInBytes(value_); }
 
     constexpr square as_square() const { return value_; }
     const std::uint64_t as_int() const { return value_; }

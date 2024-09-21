@@ -25,6 +25,8 @@ class Move {
     void SetPromotion(Promotion promotion) { data_ = (data_ & ~kPromoMask) | (static_cast<uint8_t>(promotion) << 18); }
 
 
+    void Mirror() { data_ ^= 0b111000111000111000; }
+
     std::string as_string() const {
         std::string res = duck().as_string() + '@' + from().as_string() + to().as_string();
 
@@ -63,6 +65,19 @@ using MoveList = std::vector<Move>;
 class DuckBoard {
    public:
 
+   DuckBoard() = default;
+   DuckBoard(const DuckBoard&) = default;
+   DuckBoard(const std::string& fen) { SetFromFen(fen); }
+
+   DuckBoard& operator=(const DuckBoard&) = default;
+
+   static const char* kStartposFen;
+
+   void Clear();
+   void Mirror();
+
+   void SetFromFen(std::string fen);
+
    Square duck_after_move(BoardSquare source, BoardSquare destination) const {
       return ~(((us_ | them_ | duck_) - source) | destination);
    }
@@ -94,6 +109,10 @@ class DuckBoard {
    }
 
    MoveList GenerateMoves() const;
+
+   void ApplyMove(Move move);
+
+   std::string DebugString() const;
 
    private:
 
