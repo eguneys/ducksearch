@@ -1,5 +1,9 @@
 CXX = g++
-CXXFLAGS = -Iextern/googletest/googletest/include -Iinclude -std=c++17 -pthread
+CXXFLAGS = -Iextern/googletest/googletest/include -Iinclude -Wall -Werror -std=c++17 -pthread
+LDFLAGS =
+
+DEBUG_FLAGS = -g -O0
+RELEASE_FLAGS = -O2
 
 GTEST_LIB = -Lextern/googletest/build/lib -lgtest -lgtest_main
 
@@ -13,7 +17,13 @@ TEST_TARGET= $(TARGET_DIR)/ducksearch_tests
 GTEST_BUILD_DIR = extern/googletest/build
 GTEST_MARKER = $(GTEST_BUILD_DIR)/.built
 
-all: $(GTEST_MARKER) $(TARGET_DIR) $(TARGET)
+all: release
+
+release: CXXFLAGS += $(RELEASE_FLAGS)
+release: $(GTEST_MARKER) $(TARGET_DIR) $(TARGET)
+
+debug: CXXFLAGS += $(DEBUG_FLAGS)
+debug: $(GTEST_MARKER) $(TARGET_DIR) $(TARGET)
 
 $(TARGET_DIR):
 	mkdir -p $@
@@ -25,11 +35,14 @@ $(GTEST_MARKER):
 	touch $@
 
 
-$(TARGET): $(OBJ)
-	$(CXX) -o $@ $^
+$(TARGET): $(OBJ) | $(TARGET_DIR)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJ) $(LDFLAGS)
 
 
-test: $(GTEST_MARKER) $(TARGET_DIR) $(TEST_TARGET)
+buildtest: CXXFLAGS += $(DEBUG_FLAGS)
+buildtest: $(GTEST_MARKER) $(TARGET_DIR) $(TEST_TARGET)
+
+test: buildtest
 	./$(TEST_TARGET)
 
 
@@ -39,7 +52,9 @@ $(TEST_TARGET): $(filter-out src/main.cpp, $(SRC)) $(TEST_SRC)
 %.0: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-
 clean:
 	rm -f $(OBJ) $(TARGET) $(TEST_TARGET)
-	rm -rf $(GTEST_BUILD_DIR)
+#	rm -rf $(GTEST_BUILD_DIR)
+
+
+.PHONY: all release debug clean
